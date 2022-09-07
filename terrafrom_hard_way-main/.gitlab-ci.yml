@@ -1,0 +1,71 @@
+image:
+  name: hashicorp/terraform
+  entrypoint:
+    - '/usr/bin/env'
+    - 'PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
+
+before_script:
+  - export AWS_ACCESS_KEY_ID
+  - export AWS_SECRET_ACCESS_KEY
+  - export AWS_DEFAULT_REGION
+
+stages:
+  - backend
+  - init
+  - format
+  - plan
+  - apply
+  - destroy
+
+.s3_backend:
+  stage: backend
+  script:
+    - cd backend
+    - terraform init
+    - terraform apply --auto-approve
+  artifacts:
+    paths:
+      - terraform.tfstate
+
+init:
+  stage: init
+  script:
+    - terraform init -backend-config "bucket=terraform-state-devopsthehardway-test" -backend-config "key=elasticsearch-terraform.tfstate"
+    - terraform validate
+
+    
+format:
+  dependencies:
+    - init
+  stage: format
+  script:
+    - terraform fmt
+
+plan:
+  dependencies:
+    - init
+  stage: plan
+  script:
+    - terraform init
+    - terraform plan -out "planfile"
+  artifacts:
+    paths:
+      - planfile
+
+apply:
+  stage: apply
+  script:
+    - terraform init
+    - terraform apply --auto-approve
+  dependencies:
+    - plan
+    - init
+  when: manual
+
+.destroy:
+  stage: destroy
+  script:
+    - terraform destroy --auto-approve
+  dependencies:
+    - apply
+  when: manual
